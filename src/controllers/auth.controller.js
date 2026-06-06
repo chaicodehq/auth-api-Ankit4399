@@ -14,6 +14,14 @@ import { signToken } from '../utils/jwt.js';
 export async function register(req, res, next) {
   try {
     // Your code here
+    const {name,email,password} = req.body;
+    const user = await User.findOne({email})
+    if(user){
+      return res.status(409).json({error : {message : 'Email already exists'}})
+    }
+    const newUser = await User.create({ name, email, password });
+    const userWithoutPassword = await User.findById(newUser._id);
+    return res.status(201).json({ user: userWithoutPassword });
   } catch (error) {
     next(error);
   }
@@ -32,7 +40,26 @@ export async function register(req, res, next) {
  */
 export async function login(req, res, next) {
   try {
-    // Your code here
+    const { email, password } = req.body;
+    const user = await User.findOne({ email: email?.toLowerCase() }).select('+password');
+
+    if (!user) {
+      return res.status(401).json({ error: { message: 'Invalid credentials' } });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: { message: 'Invalid credentials' } });
+    }
+
+    const token = signToken({
+      userId: user._id,
+      email: user.email,
+      role: user.role,
+    });
+
+    const userWithoutPassword = await User.findById(user._id);
+    return res.status(200).json({ token, user: userWithoutPassword });
   } catch (error) {
     next(error);
   }
@@ -46,7 +73,7 @@ export async function login(req, res, next) {
  */
 export async function me(req, res, next) {
   try {
-    // Your code here
+    return res.status(200).json({ user: req.user });
   } catch (error) {
     next(error);
   }
